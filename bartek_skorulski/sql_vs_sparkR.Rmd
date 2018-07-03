@@ -176,7 +176,7 @@ sales_sdf %>%
 ```
 
 
-## Window Function
+## Window Function (Hive)
 
 <https://cwiki.apache.org/confluence/display/Hive/LanguageManual+WindowingAndAnalytics>
 
@@ -184,12 +184,107 @@ Let's add a column that have total number of sales for each shop and item.
 
 ```{r}
 "SELECT *
-,   SUM(item_cnt_day) OVER (PARTITION BY date, shop_id) AS total_item
+,   SUM(item_cnt_day) OVER (PARTITION BY date, shop_id) AS total_items
 FROM sales
 " %>%
   sql %>%
   head(100)
 ```
+
+And some more things:
+```{r}
+"SELECT *
+,   SUM(total_items) OVER (
+        PARTITION BY shop_id ORDER BY date_block_num ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        AS cumulative_itmes
+FROM (
+    SELECT date_block_num
+    ,   shop_id
+    ,   SUM(item_cnt_day) AS total_items
+    FROM sales
+    GROUP BY date_block_num
+    ,   shop_id
+) totals
+" %>%
+  sql %>%
+  head
+```
+
+```{r}
+"SELECT *
+,   AVG(total_items) OVER (
+        PARTITION BY shop_id ORDER BY date_block_num ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING)
+        AS moving_average
+FROM (
+    SELECT date_block_num
+    ,   shop_id
+    ,   SUM(item_cnt_day) AS total_items
+    FROM sales
+    GROUP BY date_block_num
+    ,   shop_id
+) totals
+" %>%
+  sql %>%
+  head
+```
+
+### Question
+
+Could you explain the difference between those two queries?
+
+#### Query 1
+```{r}
+"SELECT *
+,   LAG(total_items) OVER (
+        PARTITION BY shop_id ORDER BY date_block_num)
+        AS previous_value
+FROM (
+    SELECT date_block_num
+    ,   shop_id
+    ,   SUM(item_cnt_day) AS total_items
+    FROM sales
+    GROUP BY date_block_num
+    ,   shop_id
+) totals
+ORDER BY shop_id
+,   date_block_num
+" %>%
+  sql %>%
+  head(20)
+```
+
+#### Query 2
+```{r}
+"SELECT this_day.date_block_num
+,   this_day.shop_id
+,   this_day.total_items
+,   prev_day.total_items AS previous_value
+FROM (
+    SELECT date_block_num
+    ,   shop_id
+    ,   SUM(item_cnt_day) AS total_items
+    FROM sales
+    GROUP BY date_block_num
+    ,   shop_id
+) this_day
+LEFT JOIN (
+    SELECT date_block_num
+    ,   shop_id
+    ,   SUM(item_cnt_day) AS total_items
+    FROM sales
+    GROUP BY date_block_num
+    ,   shop_id
+) prev_day
+ON this_day.date_block_num = prev_day.date_block_num+1
+AND this_day.shop_id = prev_day.shop_id
+ORDER BY shop_id
+,   date_block_num
+" %>%
+  sql %>%
+  head(20)
+```
+
+
 
 ## Lateral view
 
@@ -201,5 +296,7 @@ LIMIT 10
   sql %>%
   head
 ```
+
+
 
 
