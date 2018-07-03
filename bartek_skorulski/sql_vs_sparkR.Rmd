@@ -176,6 +176,21 @@ sales_sdf %>%
 ```
 
 
+## Window Function
+
+<https://cwiki.apache.org/confluence/display/Hive/LanguageManual+WindowingAndAnalytics>
+
+Let's add a column that have total number of sales for each shop and item.
+
+```{r}
+"SELECT *
+,   SUM(item_cnt_day) OVER (PARTITION BY date, shop_id) AS total_item
+FROM sales
+" %>%
+  sql %>%
+  head(100)
+```
+
 ## Lateral view
 
 ```{r}
@@ -186,4 +201,5 @@ LIMIT 10
   sql %>%
   head
 ```
+
 
