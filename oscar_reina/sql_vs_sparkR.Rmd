@@ -170,7 +170,8 @@ sales_sdf %>%
   groupBy(.$dt) %>%
   summarize(items_sold=sum(sales_sdf$item_cnt_day)) %>%
   collect %>%
-  ggplot(., aes(dt, items_sold)) +
+  #ggplot(., aes(dt, items_sold)) +  
+  ggplot(aes(dt, items_sold)) + # works as well as the prevoius line
   geom_line(colour="darkorange") +
   theme_minimal()
 ```
@@ -182,6 +183,7 @@ sales_sdf %>%
 
 Let's add a column that have total number of sales for each shop and item.
 
+# this is a sort of aggregate, adding the aggregated value to the full table
 ```{r}
 "SELECT *
 ,   SUM(item_cnt_day) OVER (PARTITION BY date, shop_id) AS total_items
@@ -192,11 +194,12 @@ FROM sales
 ```
 
 And some more things:
+# Cumulative sum
 ```{r}
 "SELECT *
 ,   SUM(total_items) OVER (
         PARTITION BY shop_id ORDER BY date_block_num ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
-        AS cumulative_itmes
+        AS cumulative_items
 FROM (
     SELECT date_block_num
     ,   shop_id
@@ -207,9 +210,10 @@ FROM (
 ) totals
 " %>%
   sql %>%
-  head
+  head(100)
 ```
 
+# Moving average
 ```{r}
 "SELECT *
 ,   AVG(total_items) OVER (
@@ -232,7 +236,7 @@ FROM (
 
 Could you explain the difference between those two queries?
 
-#### Query 1
+#### Query 1, uses window function
 ```{r}
 "SELECT *
 ,   LAG(total_items) OVER (
@@ -253,7 +257,7 @@ ORDER BY shop_id
   head(20)
 ```
 
-#### Query 2
+#### Query 2, left join, this is strictly correct if some shop id is missing, since the window function is ordering by shop id
 ```{r}
 "SELECT this_day.date_block_num
 ,   this_day.shop_id
@@ -286,7 +290,7 @@ ORDER BY shop_id
 
 
 
-## Lateral view
+## Lateral view, splits by a field, expands vertically with as many resulting elements of the split
 
 ```{r}
 "SELECT *
@@ -296,7 +300,15 @@ LIMIT 10
   sql %>%
   head
 ```
-
+```{r}
+"SELECT *
+FROM sales LATERAL VIEW explode(split(date, '\\\\.')) t AS numbers
+LIMIT 10
+" %>%
+  sql %>%
+  head
+```
+Use the window function to run the question from yesterday 
 
 
 
